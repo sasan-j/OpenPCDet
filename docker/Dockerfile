@@ -1,47 +1,13 @@
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
+FROM nvidia/cuda:11.6.2-cudnn8-devel-ubuntu20.04
 
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
 # Install basics
 RUN apt-get update -y \
     && apt-get install build-essential \
-    && apt-get install -y apt-utils git curl ca-certificates bzip2 tree htop wget \
-    && apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev bmon iotop g++ python3.9 python3.9-dev python3.9-distutils
-
-# Install cmake v3.13.2
-RUN apt-get purge -y cmake && \
-    mkdir /root/temp && \
-    cd /root/temp && \
-    wget https://github.com/Kitware/CMake/releases/download/v3.13.2/cmake-3.13.2.tar.gz && \
-    tar -xzvf cmake-3.13.2.tar.gz && \
-    cd cmake-3.13.2 && \
-    bash ./bootstrap && \
-    make && \
-    make install && \
-    cmake --version && \
-    rm -rf /root/temp
-
-# Install python
-RUN ln -sv /usr/bin/python3.9 /usr/bin/python
-RUN wget https://bootstrap.pypa.io/get-pip.py && \
-	python get-pip.py && \
-	rm get-pip.py
-
-# Install python packages
-RUN PIP_INSTALL="python -m pip --no-cache-dir install" && \
-    $PIP_INSTALL numpy==1.19.3 llvmlite numba 
-
-# Install torch and torchvision
-# See https://pytorch.org/ for other options if you use a different version of CUDA
-# RUN pip install --user torch==1.6 torchvision==0.7.0 -f https://download.pytorch.org/whl/cu102/torch_stable.html
-# RUN conda install pytorch==1.13.1 torchvision==0.14.1 pytorch-cuda=11.6 -c pytorch -c nvidia
-RUN pip3 install torch==1.13.1 torchvision==0.14.1  --index-url https://download.pytorch.org/whl/cu116
-
-# Install python packages
-RUN PIP_INSTALL="python -m pip --no-cache-dir install" && \
-    $PIP_INSTALL tensorboardX easydict pyyaml scikit-image tqdm SharedArray six
-
-WORKDIR /root
+    && apt-get install -y apt-utils git curl ca-certificates bzip2 tree htop wget sudo \
+    && apt-get install -y libglib2.0-0 libgl1 libsm6 libxext6 libxrender-dev bmon iotop g++ \
+     python3.9 python3.9-dev python3-pip python3.9-distutils python-is-python3
 
 # Install Boost geometry
 RUN wget https://jaist.dl.sourceforge.net/project/boost/boost/1.68.0/boost_1_68_0.tar.gz && \
@@ -50,8 +16,32 @@ RUN wget https://jaist.dl.sourceforge.net/project/boost/boost/1.68.0/boost_1_68_
     rm -rf ./boost_1_68_0 && \
     rm -rf ./boost_1_68_0.tar.gz 
 
-# A weired problem that hasn't been solved yet
-RUN pip uninstall -y SharedArray && \
-    pip install SharedArray
+# Install python
+# RUN ln -sv /usr/bin/python3.9 /usr/bin/python
+# RUN wget https://bootstrap.pypa.io/get-pip.py && \
+# 	python get-pip.py && \
+# 	rm get-pip.py
 
-RUN pip install spconv-cu118 ipykernel
+RUN useradd -ms /bin/bash jdgr && usermod -aG sudo jdgr && \
+    echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
+    echo 'export PATH=/home/jdgr/.local/bin:$PATH' >> /home/jdgr/.bashrc
+USER jdgr
+
+WORKDIR /home/jdgr/
+
+# Install python packages
+RUN python -m pip --no-cache-dir install --user numpy llvmlite numba 
+
+# Install torch and torchvision
+# See https://pytorch.org/ for other options if you use a different version of CUDA
+# RUN pip install --user torch==1.6 torchvision==0.7.0 -f https://download.pytorch.org/whl/cu102/torch_stable.html
+# RUN conda install pytorch==1.13.1 torchvision==0.14.1 pytorch-cuda=11.6 -c pytorch -c nvidia
+RUN python -m pip install --user torch==1.13.1 torchvision==0.14.1  --index-url https://download.pytorch.org/whl/cu116
+
+# Install python packages
+RUN python -m pip --no-cache-dir install --user tensorboardX easydict pyyaml scikit-image tqdm \
+     SharedArray six pyquaternion opencv-python-headless av2 kornia
+
+# A weired problem that hasn't been solved yet
+RUN python -m pip uninstall -y SharedArray && \
+    python -m pip --no-cache-dir install --user SharedArray spconv-cu116 ipykernel
